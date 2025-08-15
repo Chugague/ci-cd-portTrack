@@ -1,0 +1,38 @@
+# Archivo de configuración para el servidor de Prometheus
+# Este archivo define qué servicios monitorear y cómo hacerlo.
+
+global:
+  # Intervalo de scrape predeterminado
+  scrape_interval: 15s
+
+scrape_configs:
+  # Job para monitorear el clúster de Kubernetes
+  - job_name: 'kubernetes-cadvisor'
+    metrics_path: /metrics/cadvisor
+    scheme: https
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      # Reetiquetar métricas para un mejor filtrado
+      - source_labels: [__meta_kubernetes_node_label_node_type]
+        regex: (.+)
+        action: keep
+
+  # Job para monitorear los microservicios de PortTrack
+  - job_name: 'porttrack-microservices'
+    kubernetes_sd_configs:
+      - role: endpoints
+    relabel_configs:
+      # Descubrir servicios que exponen un puerto llamado 'http-metrics'
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: $1
+      # Capturar el nombre del servicio
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: job_name
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        target_label: container_name
